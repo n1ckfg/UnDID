@@ -1,0 +1,22 @@
+node {
+   name rightKneeBend # joint name
+   axis 1 0 0 # joint axis
+   sensor 5 # sensor index
+   scale 25 # gear ratio
+   node {
+      name rightCalve # rod name
+      length 4 # rod length
+      node {
+         name rightAnkleSwivel
+         axis 0 0 1
+         sensor 6
+         scale -10
+         node {
+            name rightAnkleBend
+            axis 1 0 0
+            sensor 7
+            scale 25
+         }
+      }
+   }
+}
