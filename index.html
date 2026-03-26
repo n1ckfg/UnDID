@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UnDID - Skeleton Rig</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; font-family: system-ui, sans-serif; }
+    canvas { display: block; }
+    #ui {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 100;
+    }
+    #ui button {
+      padding: 10px 20px;
+      font-size: 14px;
+      cursor: pointer;
+      background: #333;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      margin-right: 10px;
+    }
+    #ui button:hover { background: #555; }
+    #info {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      color: #333;
+      font-size: 14px;
+      background: rgba(255,255,255,0.9);
+      padding: 10px 15px;
+      border-radius: 4px;
+    }
+    #jointLabel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      color: #333;
+      font-size: 16px;
+      background: rgba(255,255,255,0.9);
+      padding: 10px 15px;
+      border-radius: 4px;
+      display: none;
+    }
+    input[type="file"] { display: none; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <button id="importBtn">Import Spec</button>
+    <button id="loadDefaultBtn">Load Default</button>
+    <input type="file" id="fileInput" accept=".json">
+  </div>
+  <div id="info">Click and drag joints to rotate. Orbit: left-click + drag. Zoom: scroll.</div>
+  <div id="jointLabel"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // Scene setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf0f0f0);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(3, 2, 4);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(5, 10, 7);
+    scene.add(directionalLight);
+
+    // Grid helper
+    const gridHelper = new THREE.GridHelper(10, 20, 0xcccccc, 0xe0e0e0);
+    scene.add(gridHelper);
+
+    // Joint and rod materials
+    const jointMaterial = new THREE.MeshStandardMaterial({ color: 0x4488ff });
+    const jointHoverMaterial = new THREE.MeshStandardMaterial({ color: 0x66aaff });
+    const jointSelectedMaterial = new THREE.MeshStandardMaterial({ color: 0xff6644 });
+    const rodMaterial = new THREE.MeshStandardMaterial({ color: 0x888888 });
+
+    // Skeleton state
+    let skeletonRoot = null;
+    const joints = [];
+    const jointObjects = new Map();
+
+    // Interaction state
+    let selectedJoint = null;
+    let isDragging = false;
+    let dragStartPoint = new THREE.Vector2();
+    let dragStartAngle = 0;
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    // Build skeleton from spec
+    function buildSkeleton(spec) {
+      // Clear existing skeleton
+      if (skeletonRoot) {
+        scene.remove(skeletonRoot);
+      }
+      joints.length = 0;
+      jointObjects.clear();
+
+      skeletonRoot = new THREE.Group();
+      skeletonRoot.name = spec.name;
+
+      buildNode(spec.root, skeletonRoot, new THREE.Vector3());
+      scene.add(skeletonRoot);
+    }
+
+    function buildNode(nodeSpec, parent, offset) {
+      if (nodeSpec.type === 'joint') {
+        // Create joint pivot point
+        const jointGroup = new THREE.Group();
+        jointGroup.name = nodeSpec.name;
+        jointGroup.userData.type = 'joint';
+        jointGroup.userData.axis = new THREE.Vector3(...(nodeSpec.axis || [0, 1, 0])).normalize();
+        jointGroup.userData.angle = 0;
+
+        // Apply offset if specified
+        const nodeOffset = nodeSpec.offset ? new THREE.Vector3(...nodeSpec.offset) : new THREE.Vector3();
+        jointGroup.position.copy(offset.clone().add(nodeOffset));
+
+        // Create visible joint sphere
+        const jointGeometry = new THREE.SphereGeometry(0.08, 16, 16);
+        const jointMesh = new THREE.Mesh(jointGeometry, jointMaterial.clone());
+        jointMesh.name = nodeSpec.name + '_mesh';
+        jointMesh.userData.jointGroup = jointGroup;
+        jointMesh.userData.jointName = nodeSpec.name;
+        jointGroup.add(jointMesh);
+
+        // Visualize rotation axis
+        const axisGeometry = new THREE.CylinderGeometry(0.01, 0.01, 0.3, 8);
+        const axisMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.5 });
+        const axisMesh = new THREE.Mesh(axisGeometry, axisMaterial);
+
+        // Orient cylinder to match joint axis
+        const axis = jointGroup.userData.axis;
+        const up = new THREE.Vector3(0, 1, 0);
+        const quaternion = new THREE.Quaternion().setFromUnitVectors(up, axis);
+        axisMesh.quaternion.copy(quaternion);
+        jointGroup.add(axisMesh);
+
+        parent.add(jointGroup);
+        joints.push(jointGroup);
+        jointObjects.set(jointMesh, jointGroup);
+
+        // Process children with zero offset (relative to this joint)
+        if (nodeSpec.children) {
+          for (const child of nodeSpec.children) {
+            buildNode(child, jointGroup, new THREE.Vector3());
+          }
+        }
+      } else if (nodeSpec.type === 'rod') {
+        // Create rod connecting to children
+        const length = nodeSpec.length || 1;
+        const direction = new THREE.Vector3(...(nodeSpec.direction || [0, 1, 0])).normalize();
+        const endPoint = direction.clone().multiplyScalar(length);
+
+        // Create rod mesh
+        const rodGeometry = new THREE.CylinderGeometry(0.03, 0.03, length, 8);
+        const rodMesh = new THREE.Mesh(rodGeometry, rodMaterial.clone());
+        rodMesh.name = nodeSpec.name;
+
+        // Position rod at midpoint and orient along direction
+        rodMesh.position.copy(offset.clone().add(endPoint.clone().multiplyScalar(0.5)));
+
+        const up = new THREE.Vector3(0, 1, 0);
+        const quaternion = new THREE.Quaternion().setFromUnitVectors(up, direction);
+        rodMesh.quaternion.copy(quaternion);
+
+        parent.add(rodMesh);
+
+        // Process children at end of rod
+        if (nodeSpec.children) {
+          for (const child of nodeSpec.children) {
+            buildNode(child, parent, offset.clone().add(endPoint));
+          }
+        }
+      }
+    }
+
+    // Mouse interaction
+    function onMouseMove(event) {
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      if (isDragging && selectedJoint) {
+        // Calculate rotation based on mouse movement
+        const deltaX = event.clientX - dragStartPoint.x;
+        const rotationSpeed = 0.01;
+        const newAngle = dragStartAngle + deltaX * rotationSpeed;
+
+        // Apply rotation around joint axis
+        const axis = selectedJoint.userData.axis;
+        selectedJoint.quaternion.setFromAxisAngle(axis, newAngle);
+        selectedJoint.userData.angle = newAngle;
+      } else {
+        // Hover highlighting
+        raycaster.setFromCamera(mouse, camera);
+        const jointMeshes = Array.from(jointObjects.keys());
+        const intersects = raycaster.intersectObjects(jointMeshes);
+
+        // Reset all non-selected joints to default material
+        for (const [mesh, group] of jointObjects) {
+          if (group !== selectedJoint) {
+            mesh.material.color.setHex(0x4488ff);
+          }
+        }
+
+        if (intersects.length > 0) {
+          const mesh = intersects[0].object;
+          const group = jointObjects.get(mesh);
+          if (group !== selectedJoint) {
+            mesh.material.color.setHex(0x66aaff);
+          }
+          document.body.style.cursor = 'pointer';
+        } else {
+          document.body.style.cursor = 'default';
+        }
+      }
+    }
+
+    function onMouseDown(event) {
+      if (event.button !== 0) return;
+
+      raycaster.setFromCamera(mouse, camera);
+      const jointMeshes = Array.from(jointObjects.keys());
+      const intersects = raycaster.intersectObjects(jointMeshes);
+
+      if (intersects.length > 0) {
+        const mesh = intersects[0].object;
+        const group = jointObjects.get(mesh);
+
+        // Deselect previous joint
+        if (selectedJoint) {
+          const prevMesh = selectedJoint.children.find(c => c.userData.jointName);
+          if (prevMesh) prevMesh.material.color.setHex(0x4488ff);
+        }
+
+        selectedJoint = group;
+        mesh.material.color.setHex(0xff6644);
+
+        // Show joint label
+        const label = document.getElementById('jointLabel');
+        label.textContent = group.name;
+        label.style.display = 'block';
+
+        // Start dragging
+        isDragging = true;
+        dragStartPoint.set(event.clientX, event.clientY);
+        dragStartAngle = group.userData.angle || 0;
+        controls.enabled = false;
+
+        event.preventDefault();
+      }
+    }
+
+    function onMouseUp(event) {
+      if (isDragging) {
+        isDragging = false;
+        controls.enabled = true;
+      }
+    }
+
+    // File import
+    document.getElementById('importBtn').addEventListener('click', () => {
+      document.getElementById('fileInput').click();
+    });
+
+    document.getElementById('fileInput').addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const spec = JSON.parse(e.target.result);
+            buildSkeleton(spec);
+          } catch (err) {
+            alert('Error parsing spec file: ' + err.message);
+          }
+        };
+        reader.readAsText(file);
+      }
+    });
+
+    // Load default spec
+    document.getElementById('loadDefaultBtn').addEventListener('click', async () => {
+      try {
+        const response = await fetch('skeleton_spec.json');
+        const spec = await response.json();
+        buildSkeleton(spec);
+      } catch (err) {
+        alert('Error loading default spec: ' + err.message);
+      }
+    });
+
+    // Event listeners
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mouseup', onMouseUp);
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Animation loop
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

@@ -1,0 +1,154 @@
+{
+  "name": "dinosaur",
+  "root": {
+    "type": "joint",
+    "name": "hips",
+    "position": [0, 1.5, 0],
+    "axis": [0, 1, 0],
+    "children": [
+      {
+        "type": "rod",
+        "name": "spine",
+        "length": 1.2,
+        "direction": [0, 0.3, -1],
+        "children": [
+          {
+            "type": "joint",
+            "name": "head",
+            "axis": [1, 0, 0],
+            "children": [
+              {
+                "type": "rod",
+                "name": "skull",
+                "length": 0.6,
+                "direction": [0, 0.2, -1],
+                "children": [
+                  {
+                    "type": "joint",
+                    "name": "jaw",
+                    "axis": [1, 0, 0]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "rod",
+        "name": "tailBase",
+        "length": 1.8,
+        "direction": [0, 0.1, 1],
+        "children": [
+          {
+            "type": "joint",
+            "name": "tail",
+            "axis": [0, 1, 0]
+          }
+        ]
+      },
+      {
+        "type": "joint",
+        "name": "rhip",
+        "axis": [1, 0, 0],
+        "offset": [0.3, 0, 0],
+        "children": [
+          {
+            "type": "rod",
+            "name": "rthigh",
+            "length": 0.8,
+            "direction": [0.1, -1, 0],
+            "children": [
+              {
+                "type": "joint",
+                "name": "rknee",
+                "axis": [1, 0, 0],
+                "children": [
+                  {
+                    "type": "rod",
+                    "name": "rcalf",
+                    "length": 0.7,
+                    "direction": [0, -1, 0.2],
+                    "children": [
+                      {
+                        "type": "joint",
+                        "name": "rankle",
+                        "axis": [1, 0, 0],
+                        "children": [
+                          {
+                            "type": "rod",
+                            "name": "rfoot",
+                            "length": 0.4,
+                            "direction": [0, -0.3, -1],
+                            "children": [
+                              {
+                                "type": "joint",
+                                "name": "rtoe",
+                                "axis": [1, 0, 0]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "joint",
+        "name": "lhip",
+        "axis": [1, 0, 0],
+        "offset": [-0.3, 0, 0],
+        "children": [
+          {
+            "type": "rod",
+            "name": "lthigh",
+            "length": 0.8,
+            "direction": [-0.1, -1, 0],
+            "children": [
+              {
+                "type": "joint",
+                "name": "lknee",
+                "axis": [1, 0, 0],
+                "children": [
+                  {
+                    "type": "rod",
+                    "name": "lcalf",
+                    "length": 0.7,
+                    "direction": [0, -1, 0.2],
+                    "children": [
+                      {
+                        "type": "joint",
+                        "name": "lankle",
+                        "axis": [1, 0, 0],
+                        "children": [
+                          {
+                            "type": "rod",
+                            "name": "lfoot",
+                            "length": 0.4,
+                            "direction": [0, -0.3, -1],
+                            "children": [
+                              {
+                                "type": "joint",
+                                "name": "ltoe",
+                                "axis": [1, 0, 0]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
