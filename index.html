@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UnDID - Skeleton Rig</title>
+  <title>UnDID - Dinosaur Input Device Emulator</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { overflow: hidden; font-family: system-ui, sans-serif; }
@@ -51,7 +51,7 @@
 </head>
 <body>
   <div id="ui">
-    <button id="importBtn">Import Spec</button>
+    <button id="importBtn">Import Skeleton</button>
     <button id="loadDefaultBtn">Load Default</button>
     <input type="file" id="fileInput" accept=".json">
   </div>
@@ -118,8 +118,8 @@
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
-    // Build skeleton from spec
-    function buildSkeleton(spec) {
+    // Build skeleton from json data
+    function buildSkeleton(data) {
       // Clear existing skeleton
       if (skeletonRoot) {
         scene.remove(skeletonRoot);
@@ -128,9 +128,9 @@
       jointObjects.clear();
 
       skeletonRoot = new THREE.Group();
-      skeletonRoot.name = spec.name;
+      skeletonRoot.name = data.name;
 
-      buildNode(spec.root, skeletonRoot, new THREE.Vector3());
+      buildNode(data.root, skeletonRoot, new THREE.Vector3());
       scene.add(skeletonRoot);
     }
 
@@ -300,24 +300,24 @@
         const reader = new FileReader();
         reader.onload = (e) => {
           try {
-            const spec = JSON.parse(e.target.result);
-            buildSkeleton(spec);
+            const data = JSON.parse(e.target.result);
+            buildSkeleton(data);
           } catch (err) {
-            alert('Error parsing spec file: ' + err.message);
+            alert('Error parsing json file: ' + err.message);
           }
         };
         reader.readAsText(file);
       }
     });
 
-    // Load default spec
+    // Load default skeleton
     document.getElementById('loadDefaultBtn').addEventListener('click', async () => {
       try {
         const response = await fetch('skeleton_spec.json');
-        const spec = await response.json();
-        buildSkeleton(spec);
+        const data = await response.json();
+        buildSkeleton(data);
       } catch (err) {
-        alert('Error loading default spec: ' + err.message);
+        alert('Error loading default skeleton: ' + err.message);
       }
     });
 
